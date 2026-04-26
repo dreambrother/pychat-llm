@@ -7,100 +7,9 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.screen import Screen
 
-from pychat_llm.llm import LLMProvider
 from pychat_llm.providers.mock import MockLLMProvider
 from pychat_llm.service import ChatService
 from pychat_llm.persistence_fs import FileSystemChatPersistence
-
-
-class ChatInput(TextArea):
-    BINDINGS = [
-        Binding("enter", "submit", "Submit", show=True, priority=True),
-        Binding("ctrl+enter", "newline", "New line", show=True),
-    ]
-
-    def action_submit(self) -> None:
-        self.post_message(self.Submitted(self))
-
-    def action_newline(self) -> None:
-        self.insert("\n")
-
-    class Submitted(Message):
-        def __init__(self, text_area: TextArea) -> None:
-            super().__init__()
-            self.text_area = text_area
-
-
-class MessageBubble(Static):
-    DEFAULT_CSS = """
-    MessageBubble {
-        width: auto;
-        max-width: 80%;
-        padding: 1 2;
-        margin-bottom: 1;
-    }
-
-    MessageBubble.user {
-        background: $primary;
-        color: $text;
-    }
-
-    MessageBubble.assistant {
-        background: $surface;
-        color: $text;
-    }
-    """
-
-    def __init__(self, text: str, is_user: bool = False, **kwargs):
-        super().__init__(**kwargs)
-        self.text = text
-        self.is_user = is_user
-
-    def render(self) -> str:
-        return self.text
-
-
-class MessageContainer(VerticalScroll):
-    DEFAULT_CSS = """
-    MessageContainer {
-        height: 1fr;
-        border: solid gray;
-        padding: 1 2 1 1;
-    }
-    """
-
-
-class ChatListScreen(Screen):
-    BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
-    ]
-
-    def __init__(self, chat_paths: list[Path], load_chat_fn, **kwargs):
-        super().__init__(**kwargs)
-        self._chat_paths = chat_paths
-        self._load_chat_fn = load_chat_fn
-
-    def compose(self) -> ComposeResult:
-        yield Label("Select a chat to open:", id="chat-list-title")
-        if not self._chat_paths:
-            yield Label("No saved chats yet.", id="no-chats")
-        else:
-            items = []
-            for chat_path in self._chat_paths:
-                title, _ = self._load_chat_fn(chat_path)
-                display = f"{title}  ({chat_path.name})"
-                item = ListItem(Label(display))
-                item.chat_path = chat_path
-                items.append(item)
-            yield ListView(*items, id="chat-list-view")
-        yield Button("Cancel", id="cancel-chat-list", variant="default")
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        self.dismiss(event.item.chat_path)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel-chat-list":
-            self.dismiss(None)
 
 
 class ChatApp(App):
@@ -268,6 +177,96 @@ class ChatApp(App):
             self.chat_title = text[:60]
         await self.add_message(self._service.get_llm_response(text), is_user=False)
         self._save_current_chat()
+
+
+class ChatInput(TextArea):
+    BINDINGS = [
+        Binding("enter", "submit", "Submit", show=True, priority=True),
+        Binding("ctrl+enter", "newline", "New line", show=True),
+    ]
+
+    def action_submit(self) -> None:
+        self.post_message(self.Submitted(self))
+
+    def action_newline(self) -> None:
+        self.insert("\n")
+
+    class Submitted(Message):
+        def __init__(self, text_area: TextArea) -> None:
+            super().__init__()
+            self.text_area = text_area
+
+
+class MessageBubble(Static):
+    DEFAULT_CSS = """
+    MessageBubble {
+        width: auto;
+        max-width: 80%;
+        padding: 1 2;
+        margin-bottom: 1;
+    }
+
+    MessageBubble.user {
+        background: $primary;
+        color: $text;
+    }
+
+    MessageBubble.assistant {
+        background: $surface;
+        color: $text;
+    }
+    """
+
+    def __init__(self, text: str, is_user: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.text = text
+        self.is_user = is_user
+
+    def render(self) -> str:
+        return self.text
+
+
+class MessageContainer(VerticalScroll):
+    DEFAULT_CSS = """
+    MessageContainer {
+        height: 1fr;
+        border: solid gray;
+        padding: 1 2 1 1;
+    }
+    """
+
+
+class ChatListScreen(Screen):
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+    ]
+
+    def __init__(self, chat_paths: list[Path], load_chat_fn, **kwargs):
+        super().__init__(**kwargs)
+        self._chat_paths = chat_paths
+        self._load_chat_fn = load_chat_fn
+
+    def compose(self) -> ComposeResult:
+        yield Label("Select a chat to open:", id="chat-list-title")
+        if not self._chat_paths:
+            yield Label("No saved chats yet.", id="no-chats")
+        else:
+            items = []
+            for chat_path in self._chat_paths:
+                title, _ = self._load_chat_fn(chat_path)
+                display = f"{title}  ({chat_path.name})"
+                item = ListItem(Label(display))
+                item.chat_path = chat_path
+                items.append(item)
+            yield ListView(*items, id="chat-list-view")
+        yield Button("Cancel", id="cancel-chat-list", variant="default")
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        self.dismiss(event.item.chat_path)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel-chat-list":
+            self.dismiss(None)
 
 
 def main():

@@ -21,6 +21,7 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 
 ## Code organization
 - **Top-to-bottom reading order** — functions/methods that call other functions must be defined before the functions they call
+- **Classes in modules** — main class (entrypoint) should be defined first, before classes it uses
 - CSS should be defined in the class it belongs to, not in parent containers
 
 ## Anti-patterns to avoid
