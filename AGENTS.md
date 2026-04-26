@@ -17,7 +17,7 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 - `src/pychat_llm/persistence.py` — `ChatPersistence` abstract protocol
 - `src/pychat_llm/persistence_fs.py` — `FileSystemChatPersistence` implementation
 - `src/pychat_llm/history.py` — low-level file I/O (used by persistence_fs)
-- `tests/` — empty (no test framework configured yet)
+- `tests/` — pytest integration tests with mocked LLM and real file I/O
 
 ## Code organization
 - **Top-to-bottom reading order** — functions/methods that call other functions must be defined before the functions they call
@@ -59,6 +59,42 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 - Only dependency: `textual`
 - CLI entry: `pychat-llm` → `pychat_llm.app:main`
 - Send message: **Enter** in the TextArea (Ctrl+Enter for new line)
-- No linter, formatter, typechecker, or CI configured yet
-- Python code must follow **PEP 8**
+
+## Testing
+
+Tests use **pytest** with **pytest-asyncio** for async Textual app testing.
+
+### Running tests
+```
+poetry run python -m pytest tests/ -v
+```
+
+### Testing approach
+Integration tests with real files from temporary directories and mocked LLM providers.
+
+**Key patterns:**
+- `app.run_test()` — runs Textual app in test mode, returns Pilot for interaction
+- `pilot.click("#widget-id")` — focus widget before typing
+- `pilot.press("enter")` — simulate key presses
+- `pilot.pause()` — allow async operations to complete
+- `history_module.HISTORY_DIR = tmp_path` — redirect file storage to temp directory
+
+**Fixtures (conftest.py):**
+- `mock_llm` — `MockLLMProvider` returning configurable response
+- `mock_persistence` — `MagicMock` for service-layer testing
+- `app_with_service` — `ChatApp` with mock service (UI + service integration)
+- `app_with_real_persistence` — `ChatApp` with real `FileSystemChatPersistence` using temp directory
+
+**Test structure:**
+```
+tests/
+├── conftest.py     # fixtures
+└── test_app.py     # integration tests (one test per case)
+```
+
+### Writing new tests
+1. Use `app_with_service` for tests needing controlled LLM responses
+2. Use inline temp path setup for tests needing real file I/O (see existing examples)
+3. Always call `await pilot.pause()` after async operations
+4. For message input: click textarea first, set `.text`, then press Enter
 - Update `AGENTS.md` whenever implementation changes
