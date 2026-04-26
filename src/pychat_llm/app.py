@@ -1,4 +1,3 @@
-import random
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -8,26 +7,10 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.screen import Screen
 
-from pychat_llm.history import (
-    list_chats,
-    load_chat,
-    save_chat,
-    save_chat_to_path,
-)
-
-
-LLM_RESPONSES = [
-    "Интересный вопрос! Дайте подумать...",
-    "Понимаю вашу обеспокоенность. Вот что могу сказать.",
-    "Отличная мысль! Вот мой взгляд на эту тему.",
-    "Исходя из моих знаний, вот что могу поделиться.",
-    "Это сложная тема. Позвольте разложить её по полочкам.",
-    "Спасибо за вопрос. Вот подробный ответ.",
-    "Вот что я думаю — это зависит от нескольких факторов.",
-    "Интересно! Позвольте дать немного контекста.",
-    "С радостью помогу. Вот моё мнение на этот счёт.",
-    "Распространённый вопрос. Вот развёрнутый ответ.",
-]
+from pychat_llm.llm import LLMProvider
+from pychat_llm.providers.mock import MockLLMProvider
+from pychat_llm.service import ChatService
+from pychat_llm.persistence_fs import FileSystemChatPersistence
 
 
 class ChatInput(TextArea):
@@ -49,23 +32,7 @@ class ChatInput(TextArea):
 
 
 class MessageBubble(Static):
-    def __init__(self, text: str, is_user: bool = False, **kwargs):
-        super().__init__(**kwargs)
-        self.text = text
-        self.is_user = is_user
-
-    def render(self) -> str:
-        return self.text
-
-
-class MessageContainer(VerticalScroll):
     DEFAULT_CSS = """
-    MessageContainer {
-        height: 1fr;
-        border: solid gray;
-        padding: 1 2 1 1;
-    }
-
     MessageBubble {
         width: auto;
         max-width: 80%;
@@ -84,21 +51,43 @@ class MessageContainer(VerticalScroll):
     }
     """
 
+    def __init__(self, text: str, is_user: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.text = text
+        self.is_user = is_user
+
+    def render(self) -> str:
+        return self.text
+
+
+class MessageContainer(VerticalScroll):
+    DEFAULT_CSS = """
+    MessageContainer {
+        height: 1fr;
+        border: solid gray;
+        padding: 1 2 1 1;
+    }
+    """
+
 
 class ChatListScreen(Screen):
     BINDINGS = [
         Binding("escape", "app.pop_screen", "Back"),
     ]
 
+    def __init__(self, chat_paths: list[Path], load_chat_fn, **kwargs):
+        super().__init__(**kwargs)
+        self._chat_paths = chat_paths
+        self._load_chat_fn = load_chat_fn
+
     def compose(self) -> ComposeResult:
         yield Label("Select a chat to open:", id="chat-list-title")
-        chats = list_chats()
-        if not chats:
+        if not self._chat_paths:
             yield Label("No saved chats yet.", id="no-chats")
         else:
             items = []
-            for chat_path in chats:
-                title, _ = load_chat(chat_path)
+            for chat_path in self._chat_paths:
+                title, _ = self._load_chat_fn(chat_path)
                 display = f"{title}  ({chat_path.name})"
                 item = ListItem(Label(display))
                 item.chat_path = chat_path
@@ -174,8 +163,12 @@ class ChatApp(App):
         Binding("ctrl+o", "open_chat", "Open Chat", show=True),
     ]
 
-    def __init__(self, **kwargs):
+    def __init__(self, chat_service: ChatService | None = None, **kwargs):
         super().__init__(**kwargs)
+        self._service = chat_service or ChatService(
+            llm_provider=MockLLMProvider(),
+            persistence=FileSystemChatPersistence(),
+        )
         self.messages: list[tuple[str, bool]] = []
         self.chat_title = "Untitled"
         self.chat_file: Path | None = None
@@ -205,7 +198,7 @@ class ChatApp(App):
         await self.add_message(text, is_user=True)
         if len(self.messages) == 2:
             self.chat_title = text[:60]
-        await self.add_message(random.choice(LLM_RESPONSES), is_user=False)
+        await self.add_message(self._service.get_llm_response(text), is_user=False)
         self._save_current_chat()
 
     async def add_message(self, text: str, is_user: bool = False) -> None:
@@ -227,9 +220,9 @@ class ChatApp(App):
         if not self._has_user_messages():
             return
         if self.chat_file:
-            save_chat_to_path(self.messages, self.chat_title, self.chat_file)
+            self._service.save_chat_to_path(self.messages, self.chat_title, self.chat_file)
         else:
-            self.chat_file = save_chat(self.messages, self.chat_title)
+            self.chat_file = self._service.save_chat(self.messages, self.chat_title)
 
     def _clear_messages(self) -> None:
         container = self.query_one("#messages", MessageContainer)
@@ -247,11 +240,12 @@ class ChatApp(App):
         def on_dismiss(filepath: Path | None) -> None:
             if filepath and filepath.exists():
                 self._load_chat(filepath)
-        self.push_screen(ChatListScreen(), on_dismiss)
+        chat_paths = self._service.list_chats()
+        self.push_screen(ChatListScreen(chat_paths, self._service.load_chat), on_dismiss)
 
     def _load_chat(self, filepath: Path) -> None:
         self._clear_messages()
-        title, messages = load_chat(filepath)
+        title, messages = self._service.load_chat(filepath)
         self.chat_title = title
         self.chat_file = filepath
         if messages:
