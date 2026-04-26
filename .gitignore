@@ -56,6 +56,9 @@ dmypy.json
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Chat history
+history/
+
 # Environment variables
 .env
 .env.local
