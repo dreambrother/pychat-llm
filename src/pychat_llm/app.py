@@ -120,8 +120,9 @@ class ChatApp(App):
         )
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         self.query_one("#message-input", ChatInput).focus()
+        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         textarea = self.query_one("#message-input", ChatInput)
