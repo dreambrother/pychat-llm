@@ -86,6 +86,15 @@ class ChatApp(App):
         padding: 1;
     }
 
+    #header {
+        dock: top;
+        text-align: center;
+        padding: 1;
+        margin: 1 2 0 2;
+        background: $panel;
+        color: $text;
+    }
+
     #input-container {
         height: auto;
         padding: 1;
@@ -100,6 +109,7 @@ class ChatApp(App):
     """
 
     def compose(self) -> ComposeResult:
+        yield Static("PyChat LLM", id="header")
         yield Container(
             MessageContainer(id="messages"),
             id="chat-container",
