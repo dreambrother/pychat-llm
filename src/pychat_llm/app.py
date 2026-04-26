@@ -185,22 +185,6 @@ class ChatApp(App):
         )
         yield Footer()
 
-    async def on_mount(self) -> None:
-        self.query_one("#message-input", ChatInput).focus()
-        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
-
-    async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        textarea = self.query_one("#message-input", ChatInput)
-        text = textarea.text.strip()
-        if not text:
-            return
-        textarea.text = ""
-        await self.add_message(text, is_user=True)
-        if len(self.messages) == 2:
-            self.chat_title = text[:60]
-        await self.add_message(self._service.get_llm_response(text), is_user=False)
-        self._save_current_chat()
-
     async def add_message(self, text: str, is_user: bool = False) -> None:
         self.messages.append((text, is_user))
         container = self.query_one("#messages", MessageContainer)
@@ -211,6 +195,18 @@ class ChatApp(App):
         else:
             wrapper = bubble
         await container.mount(wrapper)
+        container.scroll_end(animate=False)
+
+    def _add_message_sync(self, text: str, is_user: bool = False) -> None:
+        self.messages.append((text, is_user))
+        container = self.query_one("#messages", MessageContainer)
+        bubble = MessageBubble(text, is_user=is_user)
+        bubble.add_class("user" if is_user else "assistant")
+        if is_user:
+            wrapper = Right(bubble)
+        else:
+            wrapper = bubble
+        container.mount(wrapper)
         container.scroll_end(animate=False)
 
     def _has_user_messages(self) -> bool:
@@ -231,6 +227,17 @@ class ChatApp(App):
         self.chat_title = "Untitled"
         self.chat_file = None
 
+    def _load_chat(self, filepath: Path) -> None:
+        self._clear_messages()
+        title, messages = self._service.load_chat(filepath)
+        self.chat_title = title
+        self.chat_file = filepath
+        if messages:
+            for text, is_user in messages:
+                self._add_message_sync(text, is_user=is_user)
+        else:
+            self._add_message_sync("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+
     async def action_new_chat(self) -> None:
         self._save_current_chat()
         self._clear_messages()
@@ -243,30 +250,23 @@ class ChatApp(App):
         chat_paths = self._service.list_chats()
         self.push_screen(ChatListScreen(chat_paths, self._service.load_chat), on_dismiss)
 
-    def _load_chat(self, filepath: Path) -> None:
-        self._clear_messages()
-        title, messages = self._service.load_chat(filepath)
-        self.chat_title = title
-        self.chat_file = filepath
-        if messages:
-            for text, is_user in messages:
-                self._add_message_sync(text, is_user=is_user)
-        else:
-            self._add_message_sync("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
-
-    def _add_message_sync(self, text: str, is_user: bool = False) -> None:
-        self.messages.append((text, is_user))
-        container = self.query_one("#messages", MessageContainer)
-        bubble = MessageBubble(text, is_user=is_user)
-        bubble.add_class("user" if is_user else "assistant")
-        if is_user:
-            wrapper = Right(bubble)
-        else:
-            wrapper = bubble
-        container.mount(wrapper)
-        container.scroll_end(animate=False)
-
     def on_unmount(self) -> None:
+        self._save_current_chat()
+
+    async def on_mount(self) -> None:
+        self.query_one("#message-input", ChatInput).focus()
+        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+
+    async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+        textarea = self.query_one("#message-input", ChatInput)
+        text = textarea.text.strip()
+        if not text:
+            return
+        textarea.text = ""
+        await self.add_message(text, is_user=True)
+        if len(self.messages) == 2:
+            self.chat_title = text[:60]
+        await self.add_message(self._service.get_llm_response(text), is_user=False)
         self._save_current_chat()
 
 

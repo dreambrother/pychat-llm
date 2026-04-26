@@ -19,9 +19,11 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 - `src/pychat_llm/history.py` — low-level file I/O (used by persistence_fs)
 - `tests/` — empty (no test framework configured yet)
 
-## Architecture guidelines (SOLID)
+## Code organization
+- **Top-to-bottom reading order** — functions/methods that call other functions must be defined before the functions they call
+- CSS should be defined in the class it belongs to, not in parent containers
 
-### Dependency Injection
+## Anti-patterns to avoid
 - **High-level modules must not depend on low-level modules** — use abstractions (`Protocol`/`ABC`)
 - Dependencies should be injected via constructor, not imported directly in modules that use them
 - `ChatApp` receives `ChatService` via constructor — it should never import `history` directly
