@@ -3,6 +3,8 @@ import random
 from textual.app import App, ComposeResult
 from textual.containers import Container, Right, VerticalScroll
 from textual.widgets import Footer, Static, TextArea
+from textual.binding import Binding
+from textual.message import Message
 
 LLM_RESPONSES = [
     "Интересный вопрос! Дайте подумать...",
@@ -16,6 +18,24 @@ LLM_RESPONSES = [
     "С радостью помогу. Вот моё мнение на этот счёт.",
     "Распространённый вопрос. Вот развёрнутый ответ.",
 ]
+
+
+class ChatInput(TextArea):
+    BINDINGS = [
+        Binding("enter", "submit", "Submit", show=True, priority=True),
+        Binding("ctrl+enter", "newline", "New line", show=True),
+    ]
+
+    def action_submit(self) -> None:
+        self.post_message(self.Submitted(self))
+
+    def action_newline(self) -> None:
+        self.insert("\n")
+
+    class Submitted(Message):
+        def __init__(self, text_area: TextArea) -> None:
+            super().__init__()
+            self.text_area = text_area
 
 
 class MessageBubble(Static):
@@ -85,23 +105,22 @@ class ChatApp(App):
             id="chat-container",
         )
         yield Container(
-            TextArea(id="message-input", placeholder="Type a message... (Ctrl/Cmd+Enter to send)"),
+            ChatInput(id="message-input", placeholder="Type a message... (Enter to send)"),
             id="input-container",
         )
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#message-input", TextArea).focus()
+        self.query_one("#message-input", ChatInput).focus()
 
-    async def on_key(self, event) -> None:
-        if event.key in ("ctrl+enter", "meta+enter"):
-            textarea = self.query_one("#message-input", TextArea)
-            text = textarea.text.strip()
-            if not text:
-                return
-            textarea.text = ""
-            await self.add_message(text, is_user=True)
-            await self.add_message(random.choice(LLM_RESPONSES), is_user=False)
+    async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+        textarea = self.query_one("#message-input", ChatInput)
+        text = textarea.text.strip()
+        if not text:
+            return
+        textarea.text = ""
+        await self.add_message(text, is_user=True)
+        await self.add_message(random.choice(LLM_RESPONSES), is_user=False)
 
     async def add_message(self, text: str, is_user: bool = False) -> None:
         container = self.query_one("#messages", MessageContainer)

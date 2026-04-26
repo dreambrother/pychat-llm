@@ -18,7 +18,7 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 - Python: **>=3.14**
 - Only dependency: `textual`
 - CLI entry: `pychat-llm` → `pychat_llm.app:main`
-- Send message: **Ctrl/Cmd+Enter** in the TextArea
+- Send message: **Enter** in the TextArea (Ctrl+Enter for new line)
 - No linter, formatter, typechecker, or CI configured yet
 - Python code must follow **PEP 8**
 - Update `AGENTS.md` whenever implementation changes
