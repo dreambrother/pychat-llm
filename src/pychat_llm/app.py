@@ -33,7 +33,7 @@ class MessageContainer(VerticalScroll):
     MessageContainer {
         height: 1fr;
         border: solid gray;
-        padding: 1;
+        padding: 1 2 1 1;
     }
 
     MessageBubble {
