@@ -2,7 +2,7 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Right, VerticalScroll
-from textual.widgets import Footer, Static, TextArea, Button, Label, ListView, ListItem
+from textual.widgets import Footer, Static, TextArea, Label, ListView, ListItem
 from textual.binding import Binding
 from textual.message import Message
 from textual.screen import Screen
@@ -245,6 +245,7 @@ class ChatListScreen(Screen):
         super().__init__(**kwargs)
         self._chat_paths = chat_paths
         self._load_chat_fn = load_chat_fn
+        self._chat_items = {}
 
     def compose(self) -> ComposeResult:
         yield Label("Select a chat to open:", id="chat-list-title")
@@ -252,21 +253,19 @@ class ChatListScreen(Screen):
             yield Label("No saved chats yet.", id="no-chats")
         else:
             items = []
+            i = 1
             for chat_path in self._chat_paths:
                 title, _ = self._load_chat_fn(chat_path)
                 display = f"{title}  ({chat_path.name})"
-                item = ListItem(Label(display))
-                item.chat_path = chat_path
+                item_id = f"chat-list-item-{i}"
+                item = ListItem(Label(display), id=item_id)
+                self._chat_items[item_id] = chat_path
                 items.append(item)
+                i += 1
             yield ListView(*items, id="chat-list-view")
-        yield Button("Cancel", id="cancel-chat-list", variant="default")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        self.dismiss(event.item.chat_path)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel-chat-list":
-            self.dismiss(None)
+        self.dismiss(self._chat_items[event.item.id])
 
 
 def main():
