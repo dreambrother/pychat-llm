@@ -1,15 +1,15 @@
-from pathlib import Path
+from typing import Callable
 
+from pychat_llm.domain import HistoryItem
+from pychat_llm.history import HistoryService
+from pychat_llm.llm import LLMProvider
+from pychat_llm.providers.mock import MockLLMProvider
 from textual.app import App, ComposeResult
 from textual.containers import Container, Right, VerticalScroll
 from textual.widgets import Footer, Static, TextArea, Label, ListView, ListItem
 from textual.binding import Binding
 from textual.message import Message
 from textual.screen import Screen
-
-from pychat_llm.providers.mock import MockLLMProvider
-from pychat_llm.service import ChatService
-from pychat_llm.persistence_fs import FileSystemChatPersistence
 
 
 class ChatApp(App):
@@ -72,15 +72,10 @@ class ChatApp(App):
         Binding("ctrl+o", "open_chat", "Open Chat", show=True),
     ]
 
-    def __init__(self, chat_service: ChatService | None = None, **kwargs):
+    def __init__(self, history_service: HistoryService, llm_provider: LLMProvider, **kwargs):
         super().__init__(**kwargs)
-        self._service = chat_service or ChatService(
-            llm_provider=MockLLMProvider(),
-            persistence=FileSystemChatPersistence(),
-        )
-        self.messages: list[tuple[str, bool]] = []
-        self.chat_title = "Untitled"
-        self.chat_file: Path | None = None
+        self._history_service = history_service
+        self._llm_provider = llm_provider
 
     def compose(self) -> ComposeResult:
         yield Static("PyChat LLM", id="header")
@@ -94,8 +89,13 @@ class ChatApp(App):
         )
         yield Footer()
 
+    async def on_mount(self) -> None:
+        self.query_one("#message-input", ChatInput).focus()
+        # TODO extract to LLMService
+        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+
     async def add_message(self, text: str, is_user: bool = False) -> None:
-        self.messages.append((text, is_user))
+        self._history_service.add_message(text, is_user)
         container = self.query_one("#messages", MessageContainer)
         bubble = MessageBubble(text, is_user=is_user)
         bubble.add_class("user" if is_user else "assistant")
@@ -103,11 +103,11 @@ class ChatApp(App):
             wrapper = Right(bubble)
         else:
             wrapper = bubble
+        # TODO: why await?
         await container.mount(wrapper)
         container.scroll_end(animate=False)
 
     def _add_message_sync(self, text: str, is_user: bool = False) -> None:
-        self.messages.append((text, is_user))
         container = self.query_one("#messages", MessageContainer)
         bubble = MessageBubble(text, is_user=is_user)
         bubble.add_class("user" if is_user else "assistant")
@@ -115,56 +115,39 @@ class ChatApp(App):
             wrapper = Right(bubble)
         else:
             wrapper = bubble
+        # TODO: why no await?
         container.mount(wrapper)
         container.scroll_end(animate=False)
 
-    def _has_user_messages(self) -> bool:
-        return any(is_user for _, is_user in self.messages)
-
-    def _save_current_chat(self) -> None:
-        if not self._has_user_messages():
-            return
-        if self.chat_file:
-            self._service.save_chat_to_path(self.messages, self.chat_title, self.chat_file)
-        else:
-            self.chat_file = self._service.save_chat(self.messages, self.chat_title)
-
-    def _clear_messages(self) -> None:
-        container = self.query_one("#messages", MessageContainer)
-        container.remove_children()
-        self.messages = []
-        self.chat_title = "Untitled"
-        self.chat_file = None
-
-    def _load_chat(self, filepath: Path) -> None:
-        self._clear_messages()
-        title, messages = self._service.load_chat(filepath)
-        self.chat_title = title
-        self.chat_file = filepath
-        if messages:
-            for text, is_user in messages:
-                self._add_message_sync(text, is_user=is_user)
-        else:
-            self._add_message_sync("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
-
     async def action_new_chat(self) -> None:
-        self._save_current_chat()
+        self._history_service.save()
+        self._history_service.new_chat()
         self._clear_messages()
         await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
 
     def action_open_chat(self) -> None:
-        def on_dismiss(filepath: Path | None) -> None:
-            if filepath and filepath.exists():
-                self._load_chat(filepath)
-        chat_paths = self._service.list_chats()
-        self.push_screen(ChatListScreen(chat_paths, self._service.load_chat), on_dismiss)
+        def on_dismiss(history_item: HistoryItem | None) -> None:
+            if history_item:
+                self._load_chat(history_item.id)
+        chat_paths = self._history_service.list_chats()
+        self.push_screen(ChatListScreen(chat_paths, self._history_service.get_chat_title), on_dismiss)
+
+    def _load_chat(self, chat_id: str) -> None:
+        title, messages = self._history_service.get_chat(chat_id)
+        if not messages:
+            return
+        self._clear_messages()
+        self.chat_title = title
+        for message in messages:
+            self._add_message_sync(message.text, is_user=message.is_user)
+
+    def _clear_messages(self) -> None:
+        container = self.query_one("#messages", MessageContainer)
+        container.remove_children()
+        self.chat_title = "Untitled"
 
     def on_unmount(self) -> None:
-        self._save_current_chat()
-
-    async def on_mount(self) -> None:
-        self.query_one("#message-input", ChatInput).focus()
-        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+        self._history_service.save()
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         textarea = self.query_one("#message-input", ChatInput)
@@ -173,10 +156,12 @@ class ChatApp(App):
             return
         textarea.text = ""
         await self.add_message(text, is_user=True)
-        if len(self.messages) == 2:
-            self.chat_title = text[:60]
-        await self.add_message(self._service.get_llm_response(text), is_user=False)
-        self._save_current_chat()
+        title, messages = self._history_service.get_chat()
+        if len(messages) == 2:
+            # TODO is it used?
+            self.chat_title = title
+        await self.add_message(self._llm_provider.get_response(text), is_user=False)
+        self._history_service.save()
 
 
 class ChatInput(TextArea):
@@ -241,35 +226,36 @@ class ChatListScreen(Screen):
         Binding("escape", "app.pop_screen", "Back"),
     ]
 
-    def __init__(self, chat_paths: list[Path], load_chat_fn, **kwargs):
+    def __init__(self, history_items: list[HistoryItem], load_chat_fn: Callable[[str], str], **kwargs):
         super().__init__(**kwargs)
-        self._chat_paths = chat_paths
+        self._history_items = history_items
         self._load_chat_fn = load_chat_fn
-        self._chat_items = {}
+        self._chat_items: dict[str, HistoryItem] = {}
 
     def compose(self) -> ComposeResult:
         yield Label("Select a chat to open:", id="chat-list-title")
-        if not self._chat_paths:
+        if not self._history_items:
             yield Label("No saved chats yet.", id="no-chats")
         else:
             items = []
-            i = 1
-            for chat_path in self._chat_paths:
-                title, _ = self._load_chat_fn(chat_path)
-                display = f"{title}  ({chat_path.name})"
-                item_id = f"chat-list-item-{i}"
-                item = ListItem(Label(display), id=item_id)
-                self._chat_items[item_id] = chat_path
-                items.append(item)
-                i += 1
+            for item in self._history_items:
+                title = self._load_chat_fn(item.id)
+                item_id = f"chat-list-item-{item.id}"
+                self._chat_items[item_id] = item
+                list_item = ListItem(Label(title), id=item_id)
+                items.append(list_item)
             yield ListView(*items, id="chat-list-view")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        self.dismiss(self._chat_items[event.item.id])
+        if event.item.id:
+            self.dismiss(self._chat_items[event.item.id])
 
 
 def main():
-    app = ChatApp()
+    app = ChatApp(
+        HistoryService(),
+        MockLLMProvider()
+    )
     app.run()
 
 

@@ -1,6 +1,65 @@
 from datetime import datetime
 from pathlib import Path
 
+from pychat_llm.domain import ChatMessage, HistoryItem
+
+
+class HistoryService:
+    def __init__(self):
+        self._message_seq = 1
+        self._chat: list[ChatMessage] = []
+        self._history: dict[str, list[ChatMessage]] = {}
+
+    def add_message(self, text: str, is_user: bool):
+        item = ChatMessage(id=self._msg_id(), text=text, is_user=is_user)
+        self._chat.append(item)
+
+    def _msg_id(self) -> int:
+        new_id = self._message_seq
+        self._message_seq += 1
+        return new_id
+
+    def list_chats(self) -> list[HistoryItem]:
+        return [
+            HistoryItem(
+                id=chat_id,
+                title=self._get_chat_title(chat),
+                created_at=self._get_created_at(chat),
+            )
+            for chat_id, chat in self._history.items()
+        ]
+
+    def get_chat(self, chat_id: str | None = None) -> tuple[str, list[ChatMessage]]:
+        if (chat_id):
+            chat = self._history[chat_id]
+        else:
+            chat = self._chat
+        return self._get_chat_title(chat), chat
+
+    def save(self) -> None:
+        if not self._has_user_message(self._chat):
+            return
+        chat_id = self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S")
+        self._history[chat_id] = self._chat
+
+    def get_chat_title(self, chat_id: str) -> str:
+        return self._get_chat_title(self._history[chat_id])
+
+    def _get_chat_title(self, chat: list[ChatMessage]) -> str:
+        if not self._has_user_message(chat):
+            return ""
+        return (chat[1:2])[0].text[:30]
+
+    def _has_user_message(self, chat: list[ChatMessage]) -> bool:
+        return any(item.is_user for item in chat)
+
+    def _get_created_at(self, chat: list[ChatMessage]) -> datetime:
+        return chat[0].created_at
+
+    def new_chat(self) -> None:
+        self._chat = []
+
+# TODO remove
 HISTORY_DIR = Path("history")
 
 
