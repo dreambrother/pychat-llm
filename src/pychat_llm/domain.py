@@ -9,9 +9,32 @@ class ChatMessage:
     is_user: bool
     created_at: datetime = field(default_factory=datetime.now)
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "text": self.text,
+            "is_user": self.is_user,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ChatMessage":
+        return cls(**data | {"created_at": datetime.fromisoformat(data["created_at"])})
+
 
 @dataclass
 class HistoryItem:
     id: str
     title: str
     created_at: datetime
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "HistoryItem":
+        return cls(**data | {"created_at": datetime.fromisoformat(data["created_at"])})

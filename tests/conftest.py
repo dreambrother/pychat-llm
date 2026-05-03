@@ -19,7 +19,7 @@ def mock_llm():
 
 
 @pytest.fixture
-def in_mem_repo() -> HistoryRepository:
+def history_repo() -> HistoryRepository:
     return HistoryInMemoryRepository()
 
 
