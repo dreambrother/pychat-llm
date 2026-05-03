@@ -1,3 +1,4 @@
+from pychat_llm.repository import HistoryInMemoryRepository, HistoryRepository
 import pytest
 
 from pychat_llm.app import ChatApp
@@ -18,8 +19,13 @@ def mock_llm():
 
 
 @pytest.fixture
-def history_service():
-    return HistoryService()
+def in_mem_repo() -> HistoryRepository:
+    return HistoryInMemoryRepository()
+
+
+@pytest.fixture
+def history_service(in_mem_repo):
+    return HistoryService(history_repo=in_mem_repo)
 
 
 @pytest.fixture

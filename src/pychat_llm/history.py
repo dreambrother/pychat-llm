@@ -2,13 +2,14 @@ from datetime import datetime
 from pathlib import Path
 
 from pychat_llm.domain import ChatMessage, HistoryItem
+from pychat_llm.repository import HistoryRepository
 
 
 class HistoryService:
-    def __init__(self):
+    def __init__(self, history_repo: HistoryRepository):
         self._message_seq = 1
         self._chat: list[ChatMessage] = []
-        self._history: dict[str, list[ChatMessage]] = {}
+        self._history_repo = history_repo
 
     def add_message(self, text: str, is_user: bool):
         item = ChatMessage(id=self._msg_id(), text=text, is_user=is_user)
@@ -20,18 +21,11 @@ class HistoryService:
         return new_id
 
     def list_chats(self) -> list[HistoryItem]:
-        return [
-            HistoryItem(
-                id=chat_id,
-                title=self._get_chat_title(chat),
-                created_at=self._get_created_at(chat),
-            )
-            for chat_id, chat in self._history.items()
-        ]
+        return self._history_repo.list_chats()
 
     def get_chat(self, chat_id: str | None = None) -> tuple[str, list[ChatMessage]]:
         if (chat_id):
-            chat = self._history[chat_id]
+            chat = self._history_repo.load(chat_id)
         else:
             chat = self._chat
         return self._get_chat_title(chat), chat
@@ -39,11 +33,18 @@ class HistoryService:
     def save(self) -> None:
         if not self._has_user_message(self._chat):
             return
-        chat_id = self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S")
-        self._history[chat_id] = self._chat
+        history_item = HistoryItem(
+            id=self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S"),
+            title=self._get_chat_title(self._chat),
+            created_at=self._get_created_at(self._chat)
+        )
+        self._history_repo.save(history_item, self._chat)
 
     def get_chat_title(self, chat_id: str) -> str:
-        return self._get_chat_title(self._history[chat_id])
+        return self._get_chat_title(self._history_repo.load(chat_id))
+
+    def new_chat(self) -> None:
+        self._chat = []
 
     def _get_chat_title(self, chat: list[ChatMessage]) -> str:
         if not self._has_user_message(chat):
@@ -56,8 +57,6 @@ class HistoryService:
     def _get_created_at(self, chat: list[ChatMessage]) -> datetime:
         return chat[0].created_at
 
-    def new_chat(self) -> None:
-        self._chat = []
 
 # TODO remove
 HISTORY_DIR = Path("history")

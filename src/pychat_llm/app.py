@@ -4,6 +4,7 @@ from pychat_llm.domain import HistoryItem
 from pychat_llm.history import HistoryService
 from pychat_llm.llm import LLMProvider
 from pychat_llm.providers.mock import MockLLMProvider
+from pychat_llm.repository import HistoryInMemoryRepository
 from textual.app import App, ComposeResult
 from textual.containers import Container, Right, VerticalScroll
 from textual.widgets import Footer, Static, TextArea, Label, ListView, ListItem
@@ -252,8 +253,9 @@ class ChatListScreen(Screen):
 
 
 def main():
+    repository = HistoryInMemoryRepository()
     app = ChatApp(
-        HistoryService(),
+        HistoryService(repository),
         MockLLMProvider()
     )
     app.run()
