@@ -20,7 +20,9 @@ class HistoryService:
         return new_id
 
     def list_chats(self) -> list[HistoryItem]:
-        return self._history_repo.list_chats()
+        chats = self._history_repo.list_chats()
+        chats.sort(key=lambda item: item.created_at, reverse=True)
+        return chats
 
     def get_chat(self, chat_id: str | None = None) -> tuple[str, list[ChatMessage]]:
         if chat_id:

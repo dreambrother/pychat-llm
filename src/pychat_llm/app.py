@@ -241,9 +241,10 @@ class ChatListScreen(Screen):
             items = []
             for item in self._history_items:
                 title = self._load_chat_fn(item.id)
+                date_str = item.created_at.strftime("%d.%m.%Y %H:%M")
                 item_id = f"chat-list-item-{item.id}"
                 self._chat_items[item_id] = item
-                list_item = ListItem(Label(title), id=item_id)
+                list_item = ListItem(Label(f"{date_str}  {title}"), id=item_id)
                 items.append(list_item)
             yield ListView(*items, id="chat-list-view")
 
