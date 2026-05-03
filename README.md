@@ -1,1 +1,1 @@
-Пример TUI приложения на Python для чата с LLM
+LLM chat example TUI app
