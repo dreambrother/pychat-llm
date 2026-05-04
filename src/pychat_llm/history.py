@@ -10,9 +10,10 @@ class HistoryService:
         self._chat: list[ChatMessage] = []
         self._history_repo = history_repo
 
-    def add_message(self, text: str, is_user: bool):
+    def add_message(self, text: str, is_user: bool) -> ChatMessage:
         item = ChatMessage(id=self._msg_id(), text=text, is_user=is_user)
         self._chat.append(item)
+        return item
 
     def _msg_id(self) -> int:
         new_id = self._message_seq

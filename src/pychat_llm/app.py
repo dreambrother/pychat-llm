@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Callable
 
 from pychat_llm.domain import HistoryItem
@@ -96,9 +97,9 @@ class ChatApp(App):
         await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
 
     async def add_message(self, text: str, is_user: bool = False) -> None:
-        self._history_service.add_message(text, is_user)
+        msg = self._history_service.add_message(text, is_user)
         container = self.query_one("#messages", MessageContainer)
-        bubble = MessageBubble(text, is_user=is_user)
+        bubble = MessageBubble(text, is_user=is_user, created_at=msg.created_at)
         bubble.add_class("user" if is_user else "assistant")
         if is_user:
             wrapper = Right(bubble)
@@ -108,9 +109,9 @@ class ChatApp(App):
         await container.mount(wrapper)
         container.scroll_end(animate=False)
 
-    def _add_message_sync(self, text: str, is_user: bool = False) -> None:
+    def _add_message_sync(self, text: str, is_user: bool = False, created_at: datetime | None = None) -> None:
         container = self.query_one("#messages", MessageContainer)
-        bubble = MessageBubble(text, is_user=is_user)
+        bubble = MessageBubble(text, is_user=is_user, created_at=created_at)
         bubble.add_class("user" if is_user else "assistant")
         if is_user:
             wrapper = Right(bubble)
@@ -140,7 +141,7 @@ class ChatApp(App):
         self._clear_messages()
         self.chat_title = title
         for message in messages:
-            self._add_message_sync(message.text, is_user=message.is_user)
+            self._add_message_sync(message.text, is_user=message.is_user, created_at=message.created_at)
 
     def _clear_messages(self) -> None:
         container = self.query_one("#messages", MessageContainer)
@@ -203,13 +204,21 @@ class MessageBubble(Static):
     }
     """
 
-    def __init__(self, text: str, is_user: bool = False, **kwargs):
+    def __init__(self, text: str, is_user: bool = False, created_at: datetime | None = None, **kwargs):
         super().__init__(**kwargs)
         self.text = text
         self.is_user = is_user
+        self.created_at = created_at
 
     def render(self) -> str:
-        return self.text
+        if not self.created_at:
+            return self.text
+        now = datetime.now()
+        if self.created_at.date() == now.date():
+            time_str = self.created_at.strftime("%H:%M")
+        else:
+            time_str = self.created_at.strftime("%d.%m.%Y %H:%M")
+        return f"{self.text}\n[dim]{time_str}[/dim]"
 
 
 class MessageContainer(VerticalScroll):
