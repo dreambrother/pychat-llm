@@ -1,4 +1,4 @@
-from pychat_llm.repository import HistoryInMemoryRepository, HistoryRepository
+from pychat_llm.repository import HistoryInMemoryRepository, HistoryFileRepository, HistoryRepository
 import pytest
 
 from pychat_llm.app import ChatApp
@@ -18,14 +18,16 @@ def mock_llm():
     return MockLLMProvider()
 
 
-@pytest.fixture
-def history_repo() -> HistoryRepository:
-    return HistoryInMemoryRepository()
+@pytest.fixture(params=["in_memory", "file"])
+def history_repo(request, tmp_path) -> HistoryRepository:
+    if request.param == "in_memory":
+        return HistoryInMemoryRepository()
+    return HistoryFileRepository(str(tmp_path / "history"))
 
 
 @pytest.fixture
-def history_service(in_mem_repo):
-    return HistoryService(history_repo=in_mem_repo)
+def history_service(history_repo):
+    return HistoryService(history_repo=history_repo)
 
 
 @pytest.fixture

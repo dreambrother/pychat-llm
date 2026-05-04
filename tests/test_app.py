@@ -57,8 +57,8 @@ class TestMessageSending:
 
 class TestHistoryPersistence:
     @pytest.mark.asyncio
-    async def test_history_saved_on_app_unmount(self, mock_llm, in_mem_repo):
-        history_service = HistoryService(history_repo=in_mem_repo)
+    async def test_history_saved_on_app_unmount(self, mock_llm, history_repo):
+        history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
         async with app.run_test() as pilot:
@@ -70,13 +70,14 @@ class TestHistoryPersistence:
             await pilot.pause()
             await pilot.pause()
 
-        assert len(in_mem_repo._history) >= 1, f"Expected at least 1 saved chat, got {len(in_mem_repo._history)}"
+        chats = history_repo.list_chats()
+        assert len(chats) >= 1, f"Expected at least 1 saved chat, got {len(chats)}"
         title, messages = history_service.get_chat()
         assert any("First message" in msg.text for msg in messages)
 
     @pytest.mark.asyncio
-    async def test_subsequent_messages_appended_to_same_chat(self, mock_llm, in_mem_repo):
-        history_service = HistoryService(history_repo=in_mem_repo)
+    async def test_subsequent_messages_appended_to_same_chat(self, mock_llm, history_repo):
+        history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
         async with app.run_test() as pilot:
@@ -91,7 +92,8 @@ class TestHistoryPersistence:
             await pilot.pause()
             await pilot.pause()
 
-        assert len(in_mem_repo._history) == 1, f"Expected 1 saved chat, got {len(in_mem_repo._history)}: {list(in_mem_repo._history.keys())}"
+        chats = history_repo.list_chats()
+        assert len(chats) == 1, f"Expected 1 saved chat, got {len(chats)}"
         title, messages = history_service.get_chat()
         assert any("Message one" in msg.text for msg in messages)
         assert any("Message two" in msg.text for msg in messages)
@@ -99,13 +101,15 @@ class TestHistoryPersistence:
 
 class TestHistoryList:
     @pytest.mark.asyncio
-    async def test_history_list_displays_saved_chats(self, mock_llm, in_mem_repo):
-        history_service = HistoryService(history_repo=in_mem_repo)
-        in_mem_repo._chats["test_chat"] = [
-            ChatMessage(id=1, text="Welcome", is_user=False, created_at=datetime.now()),
-            ChatMessage(id=2, text="Hello", is_user=True, created_at=datetime.now()),
+    async def test_history_list_displays_saved_chats(self, mock_llm, history_repo):
+        now = datetime.now()
+        history_item = HistoryItem(id="test_chat", title="Test Chat", created_at=now)
+        chat_messages = [
+            ChatMessage(id=1, text="Welcome", is_user=False, created_at=now),
+            ChatMessage(id=2, text="Hello", is_user=True, created_at=now),
         ]
-        in_mem_repo._history["test_chat"] = HistoryItem(id="test_chat", title="Test Chat", created_at=datetime.now())
+        history_repo.save(history_item, chat_messages)
+        history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
         async with app.run_test() as pilot:
@@ -120,14 +124,16 @@ class TestHistoryList:
 
 class TestChatLoading:
     @pytest.mark.asyncio
-    async def test_chat_loaded_from_history(self, mock_llm, in_mem_repo):
-        history_service = HistoryService(history_repo=in_mem_repo)
-        in_mem_repo._chats["existing_chat"] = [
-            ChatMessage(id=1, text="Welcome", is_user=False, created_at=datetime.now()),
-            ChatMessage(id=2, text="User message", is_user=True, created_at=datetime.now()),
-            ChatMessage(id=3, text="Assistant reply", is_user=False, created_at=datetime.now()),
+    async def test_chat_loaded_from_history(self, mock_llm, history_repo):
+        now = datetime.now()
+        history_item = HistoryItem(id="existing_chat", title="Existing Chat", created_at=now)
+        chat_messages = [
+            ChatMessage(id=1, text="Welcome", is_user=False, created_at=now),
+            ChatMessage(id=2, text="User message", is_user=True, created_at=now),
+            ChatMessage(id=3, text="Assistant reply", is_user=False, created_at=now),
         ]
-        in_mem_repo._history["existing_chat"] = HistoryItem(id="existing_chat", title="Existing Chat", created_at=datetime.now())
+        history_repo.save(history_item, chat_messages)
+        history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
         async with app.run_test() as pilot:
