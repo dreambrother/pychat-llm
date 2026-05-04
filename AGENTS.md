@@ -9,6 +9,15 @@ poetry install
 poetry run pychat-llm   # or: python -m pychat_llm.app
 ```
 
+### CLI options
+- `-s`, `--storage` — storage backend: `file` (default) or `memory`
+
+Example:
+```
+poetry run pychat-llm --storage memory
+python -m pychat_llm.app -s memory
+```
+
 ## Project structure
 - `src/pychat_llm/app.py` — main app, UI widgets (`ChatApp`, `ChatListScreen`, `ChatInput`, `MessageBubble`, `MessageContainer`)
 - `src/pychat_llm/history.py` — `HistoryService` coordinating LLM and repository
