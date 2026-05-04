@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from typing import Callable
 
@@ -258,10 +259,23 @@ class ChatListScreen(Screen):
 
 
 def main():
-    repository = HistoryFileRepository("history")
+    parser = argparse.ArgumentParser(description="PyChat LLM")
+    parser.add_argument(
+        "-s", "--storage",
+        choices=["file", "memory"],
+        default="file",
+        help="Storage backend (default: file)",
+    )
+    args = parser.parse_args()
+
+    if args.storage == "memory":
+        repository = HistoryInMemoryRepository()
+    else:
+        repository = HistoryFileRepository("history")
+
     app = ChatApp(
         HistoryService(repository),
-        MockLLMProvider()
+        MockLLMProvider(),
     )
     app.run()
 
