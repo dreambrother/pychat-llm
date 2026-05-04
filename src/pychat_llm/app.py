@@ -94,8 +94,7 @@ class ChatApp(App):
 
     async def on_mount(self) -> None:
         self.query_one("#message-input", ChatInput).focus()
-        # TODO extract to LLMService
-        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+        await self.add_message(self._llm_provider.get_welcome_message(), is_user=False)
 
     async def add_message(self, text: str, is_user: bool = False) -> None:
         msg = self._history_service.add_message(text, is_user)
@@ -125,7 +124,7 @@ class ChatApp(App):
     async def action_new_chat(self) -> None:
         self._history_service.new_chat()
         self._clear_messages()
-        await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
+        await self.add_message(self._llm_provider.get_welcome_message(), is_user=False)
 
     def action_open_chat(self) -> None:
         def on_dismiss(history_item: HistoryItem | None) -> None:

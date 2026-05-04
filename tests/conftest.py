@@ -1,3 +1,4 @@
+from pychat_llm.llm import LLMProvider
 from pychat_llm.repository import HistoryInMemoryRepository, HistoryFileRepository, HistoryRepository
 import pytest
 
@@ -5,7 +6,7 @@ from pychat_llm.app import ChatApp
 from pychat_llm.history import HistoryService
 
 
-class MockLLMProvider:
+class MockLLMProvider(LLMProvider):
     def __init__(self, response: str = "Mock response"):
         self._response = response
 
