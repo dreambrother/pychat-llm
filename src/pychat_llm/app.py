@@ -122,7 +122,6 @@ class ChatApp(App):
         container.scroll_end(animate=False)
 
     async def action_new_chat(self) -> None:
-        self._history_service.save()
         self._history_service.new_chat()
         self._clear_messages()
         await self.add_message("Привет! Я ваш ассистент. Чем могу помочь?", is_user=False)
@@ -148,9 +147,6 @@ class ChatApp(App):
         container.remove_children()
         self.chat_title = "Untitled"
 
-    def on_unmount(self) -> None:
-        self._history_service.save()
-
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         textarea = self.query_one("#message-input", ChatInput)
         text = textarea.text.strip()
@@ -163,7 +159,6 @@ class ChatApp(App):
             # TODO is it used?
             self.chat_title = title
         await self.add_message(self._llm_provider.get_response(text), is_user=False)
-        self._history_service.save()
 
 
 class ChatInput(TextArea):

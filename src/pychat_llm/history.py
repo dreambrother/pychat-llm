@@ -13,6 +13,20 @@ class HistoryService:
     def add_message(self, text: str, is_user: bool) -> ChatMessage:
         item = ChatMessage(id=self._msg_id(), text=text, is_user=is_user)
         self._chat.append(item)
+
+        chat_id = self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S")
+        if len(self._chat) == 2:
+            # if user message was added
+            history_item = HistoryItem(
+                id=chat_id,
+                title=self._get_chat_title(self._chat),
+                created_at=self._get_created_at(self._chat),
+            )
+            self._history_repo.save(history_item)
+            self._history_repo.add_to_chat(chat_id, *self._chat)
+        elif len(self._chat) > 2:
+            self._history_repo.add_to_chat(chat_id, item)
+
         return item
 
     def _msg_id(self) -> int:
@@ -32,21 +46,12 @@ class HistoryService:
             chat = self._chat
         return self._get_chat_title(chat), chat
 
-    def save(self) -> None:
-        if not self._has_user_message(self._chat):
-            return
-        history_item = HistoryItem(
-            id=self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S"),
-            title=self._get_chat_title(self._chat),
-            created_at=self._get_created_at(self._chat),
-        )
-        self._history_repo.save(history_item, self._chat)
-
     def get_chat_title(self, chat_id: str) -> str:
         return self._get_chat_title(self._history_repo.load(chat_id))
 
     def new_chat(self) -> None:
         self._chat = []
+        self._message_seq = 1
 
     def _get_chat_title(self, chat: list[ChatMessage]) -> str:
         if not self._has_user_message(chat):

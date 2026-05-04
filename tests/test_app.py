@@ -108,7 +108,8 @@ class TestHistoryList:
             ChatMessage(id=1, text="Welcome", is_user=False, created_at=now),
             ChatMessage(id=2, text="Hello", is_user=True, created_at=now),
         ]
-        history_repo.save(history_item, chat_messages)
+        history_repo.save(history_item)
+        history_repo.add_to_chat(history_item.id, *chat_messages)
         history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
@@ -132,7 +133,8 @@ class TestChatLoading:
             ChatMessage(id=2, text="User message", is_user=True, created_at=now),
             ChatMessage(id=3, text="Assistant reply", is_user=False, created_at=now),
         ]
-        history_repo.save(history_item, chat_messages)
+        history_repo.save(history_item)
+        history_repo.add_to_chat(history_item.id, *chat_messages)
         history_service = HistoryService(history_repo=history_repo)
         app = ChatApp(history_service=history_service, llm_provider=mock_llm)
 
