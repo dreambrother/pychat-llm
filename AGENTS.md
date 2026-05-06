@@ -6,7 +6,7 @@ Textual TUI chat app (Python). LLM responses are currently mocked with random st
 ## Setup & run
 ```
 poetry install
-poetry run pychat-llm   # or: python -m pychat_llm.app
+poetry run pychat-llm   # or: python -m pychat_llm.cli
 ```
 
 ### CLI options
@@ -15,15 +15,16 @@ poetry run pychat-llm   # or: python -m pychat_llm.app
 Example:
 ```
 poetry run pychat-llm --storage memory
-python -m pychat_llm.app -s memory
+python -m pychat_llm.cli -s memory
 ```
 
 ## Project structure
-- `src/pychat_llm/app.py` — main app, UI widgets (`ChatApp`, `ChatListScreen`, `ChatInput`, `MessageBubble`, `MessageContainer`)
+- `src/pychat_llm/cli.py` — composition root: CLI args, dependency wiring, `main()`
+- `src/pychat_llm/app.py` — UI widgets (`ChatApp`, `ChatListScreen`, `ChatInput`, `MessageBubble`, `MessageContainer`)
 - `src/pychat_llm/history.py` — `HistoryService` coordinating LLM and repository
-- `src/pychat_llm/llm.py` — `LLMProvider` abstract protocol
+- `src/pychat_llm/llm.py` — `LLMProvider` abstract base class
 - `src/pychat_llm/providers/mock.py` — `MockLLMProvider` implementation
-- `src/pychat_llm/repository.py` — data access layer
+- `src/pychat_llm/repository.py` — data access layer (abstract + file/in-memory implementations)
 - `tests/` — pytest integration tests with mocked LLM and real file I/O
 
 ## Code organization
@@ -41,7 +42,7 @@ python -m pychat_llm.app -s memory
 - Package manager: **Poetry** (v2+ build backend)
 - Python: **>=3.14**
 - Only dependency: `textual`
-- CLI entry: `pychat-llm` → `pychat_llm.app:main`
+- CLI entry: `pychat-llm` → `pychat_llm.cli:main`
 
 ## Testing
 

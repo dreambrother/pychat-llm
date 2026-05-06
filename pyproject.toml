@@ -25,7 +25,7 @@ testpaths = ["tests"]
 packages = [{include = "pychat_llm", from = "src"}]
 
 [project.scripts]
-pychat-llm = "pychat_llm.app:main"
+pychat-llm = "pychat_llm.cli:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

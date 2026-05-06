@@ -1,12 +1,9 @@
-import argparse
 from datetime import datetime
 from typing import Callable
 
 from pychat_llm.domain import HistoryItem
 from pychat_llm.history import HistoryService
 from pychat_llm.llm import LLMProvider
-from pychat_llm.providers.mock import MockLLMProvider
-from pychat_llm.repository import HistoryFileRepository, HistoryInMemoryRepository
 from textual.app import App, ComposeResult
 from textual.containers import Container, Right, VerticalScroll
 from textual.widgets import Footer, Static, TextArea, Label, ListView, ListItem
@@ -96,29 +93,22 @@ class ChatApp(App):
         self.query_one("#message-input", ChatInput).focus()
         await self.add_message(self._llm_provider.get_welcome_message(), is_user=False)
 
+    def _create_bubble_widget(self, text: str, is_user: bool = False, created_at: datetime | None = None):
+        bubble = MessageBubble(text, is_user=is_user, created_at=created_at)
+        bubble.add_class("user" if is_user else "assistant")
+        return Right(bubble) if is_user else bubble
+
     async def add_message(self, text: str, is_user: bool = False) -> None:
         msg = self._history_service.add_message(text, is_user)
         container = self.query_one("#messages", MessageContainer)
-        bubble = MessageBubble(text, is_user=is_user, created_at=msg.created_at)
-        bubble.add_class("user" if is_user else "assistant")
-        if is_user:
-            wrapper = Right(bubble)
-        else:
-            wrapper = bubble
-        # TODO: why await?
-        await container.mount(wrapper)
+        widget = self._create_bubble_widget(text, is_user=is_user, created_at=msg.created_at)
+        await container.mount(widget)
         container.scroll_end(animate=False)
 
     def _add_message_sync(self, text: str, is_user: bool = False, created_at: datetime | None = None) -> None:
         container = self.query_one("#messages", MessageContainer)
-        bubble = MessageBubble(text, is_user=is_user, created_at=created_at)
-        bubble.add_class("user" if is_user else "assistant")
-        if is_user:
-            wrapper = Right(bubble)
-        else:
-            wrapper = bubble
-        # TODO: why no await?
-        container.mount(wrapper)
+        widget = self._create_bubble_widget(text, is_user=is_user, created_at=created_at)
+        container.mount(widget)
         container.scroll_end(animate=False)
 
     async def action_new_chat(self) -> None:
@@ -156,7 +146,6 @@ class ChatApp(App):
         await self.add_message(text, is_user=True)
         title, messages = self._history_service.get_chat()
         if len(messages) == 2:
-            # TODO is it used?
             self.chat_title = title
         await self.add_message(self._llm_provider.get_response(text), is_user=False)
 
@@ -255,29 +244,3 @@ class ChatListScreen(Screen):
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.item.id:
             self.dismiss(self._chat_items[event.item.id])
-
-
-def main():
-    parser = argparse.ArgumentParser(description="PyChat LLM")
-    parser.add_argument(
-        "-s", "--storage",
-        choices=["file", "memory"],
-        default="file",
-        help="Storage backend (default: file)",
-    )
-    args = parser.parse_args()
-
-    if args.storage == "memory":
-        repository = HistoryInMemoryRepository()
-    else:
-        repository = HistoryFileRepository("history")
-
-    app = ChatApp(
-        HistoryService(repository),
-        MockLLMProvider(),
-    )
-    app.run()
-
-
-if __name__ == "__main__":
-    main()

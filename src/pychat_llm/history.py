@@ -11,28 +11,10 @@ class HistoryService:
         self._history_repo = history_repo
 
     def add_message(self, text: str, is_user: bool) -> ChatMessage:
-        item = ChatMessage(id=self._msg_id(), text=text, is_user=is_user)
+        item = ChatMessage(id=self._next_id(), text=text, is_user=is_user)
         self._chat.append(item)
-
-        chat_id = self._get_created_at(self._chat).strftime("%d%m%y-%H%M%S")
-        if len(self._chat) == 2:
-            # if user message was added
-            history_item = HistoryItem(
-                id=chat_id,
-                title=self._get_chat_title(self._chat),
-                created_at=self._get_created_at(self._chat),
-            )
-            self._history_repo.save(history_item)
-            self._history_repo.add_to_chat(chat_id, *self._chat)
-        elif len(self._chat) > 2:
-            self._history_repo.add_to_chat(chat_id, item)
-
+        self._persist_if_needed(item)
         return item
-
-    def _msg_id(self) -> int:
-        new_id = self._message_seq
-        self._message_seq += 1
-        return new_id
 
     def list_chats(self) -> list[HistoryItem]:
         chats = self._history_repo.list_chats()
@@ -53,6 +35,34 @@ class HistoryService:
         self._chat = []
         self._message_seq = 1
 
+    def _next_id(self) -> int:
+        new_id = self._message_seq
+        self._message_seq += 1
+        return new_id
+
+    def _persist_if_needed(self, latest_message: ChatMessage) -> None:
+        if len(self._chat) < 2:
+            return
+        chat_id = self._chat_id()
+        if self._is_first_user_message():
+            self._history_repo.save(HistoryItem(
+                id=chat_id,
+                title=self._get_chat_title(self._chat),
+                created_at=self._chat_created_at(),
+            ))
+            self._history_repo.add_to_chat(chat_id, *self._chat)
+        else:
+            self._history_repo.add_to_chat(chat_id, latest_message)
+
+    def _is_first_user_message(self) -> bool:
+        return len(self._chat) == 2
+
+    def _chat_id(self) -> str:
+        return self._chat_created_at().strftime("%d%m%y-%H%M%S")
+
+    def _chat_created_at(self) -> datetime:
+        return self._chat[0].created_at
+
     def _get_chat_title(self, chat: list[ChatMessage]) -> str:
         if not self._has_user_message(chat):
             return ""
@@ -60,6 +70,3 @@ class HistoryService:
 
     def _has_user_message(self, chat: list[ChatMessage]) -> bool:
         return any(item.is_user for item in chat)
-
-    def _get_created_at(self, chat: list[ChatMessage]) -> datetime:
-        return chat[0].created_at
